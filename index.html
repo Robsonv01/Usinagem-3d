@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b121a"><title>Oficina 3D | Simulador de Usinagem</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand-mark">U<span>3D</span></div>
+    <div class="brand"><b>OFICINA <em>3D</em></b><small>LABORATÓRIO INTERATIVO DE USINAGEM</small></div>
+    <div class="header-right"><span class="online-dot"></span><span id="sceneStatus">AMBIENTE PRONTO</span><button id="helpBtn" title="Ajuda">?</button></div>
+  </header>
+  <main class="layout">
+    <section class="visual-area">
+      <div class="headline"><div><div class="eyebrow">SIMULADOR EDUCACIONAL • 3D EM TEMPO REAL</div><h1>Da preparação à <span>usinagem</span></h1><p>Prepare a máquina, prenda a peça e a ferramenta, ajuste a rotação e execute uma passada de usinagem.</p></div><div class="badge">INTERAÇÃO<br><strong>EM TEMPO REAL</strong></div></div>
+      <div id="viewport">
+        <div id="loading"><div class="spinner"></div><b>Preparando oficina 3D…</b><small>Carregando máquinas e componentes</small></div>
+        <div class="hud-top"><span class="hud-pill"><i></i> AMBIENTE DE TREINAMENTO</span><div class="hud-top-right"><span class="hud-pill" id="zoneLabel">OFICINA COMPLETA</span><span class="hud-pill wallet-hud"><small>SALDO</small><b id="walletHudAmount">R$ 0,00</b></span></div></div>
+        <div id="centerCrosshair"><i></i><i></i></div>
+        <div class="scene-label"><small>ESTAÇÃO EM FOCO</small><b id="sceneFocus">SALA DE USINAGEM</b><span id="sceneSubfocus">Fresadora convencional com morsa e avanço manual</span></div>
+        <div class="move-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>andar</span><kbd>SHIFT</kbd><span>correr</span></div>
+        <div class="body-hint"><kbd>C</kbd><span>agachar</span><kbd>SPACE</kbd><span>pular</span><kbd>E</kbd><span>pegar/interagir</span><kbd>Q</kbd><span>soltar</span><kbd>I</kbd><span>inventário</span></div>
+        <div id="pickupPrompt" class="pickup-prompt hidden" role="status" aria-live="polite"><kbd>E</kbd><span><b id="pickupPromptTitle">Pegar peça</b><small id="pickupPromptDetail">Adicionar ao inventário</small></span></div>
+        <button id="inventoryPeek" class="inventory-peek">▦ <span>INVENTÁRIO</span> <b id="inventoryHudCount">0/5</b></button>
+        <button id="viewModeToggle" class="view-mode-toggle">◉ VISTA: 3ª PESSOA</button>
+        <button id="aoBtn" class="fullscreen-btn ao-btn" type="button" title="Alternar oclusão de ambiente (sombras de contato em tempo real)" aria-pressed="true">&#x25D0; <span>SOMBRA 3D: ALTA</span></button>
+        <button id="fullscreenBtn" class="fullscreen-btn" type="button" aria-label="Colocar jogo em tela cheia" title="Tela cheia">&#x26F6; <span>TELA CHEIA</span></button>
+        <div id="playerStateChip" class="player-state-chip">POSTURA: EM PÉ</div>
+        <div id="epiChip" class="epi-chip" aria-live="polite"><span id="epiGogglesState" class="off">ÓCULOS ✗</span><span id="epiMuffsState" class="off">PROTETOR AURICULAR ✗</span></div>
+        <div id="gogglesOverlay" class="goggles-overlay hidden" aria-hidden="true"></div>
+        <div id="pauseMenu" class="pause-menu hidden" role="dialog" aria-label="Simulação pausada">
+          <small>SIMULAÇÃO PAUSADA</small>
+          <button type="button" id="resumeBtn">▶ Continuar</button>
+          <button type="button" id="resetSimBtn" class="danger">↺ Redefinir do zero</button>
+          <span id="resetSimHint">Apaga saldo, mochila e progresso e recomeça.</span>
+        </div>
+        <button id="enterBtn" class="enter-btn"><b>↗</b> ENTRAR NA OFICINA</button>
+        <div id="toast" class="toast hidden"></div>
+        <button id="handFreeBtn" class="fullscreen-btn hand-free-btn" type="button" title="Guardar o item da mão na mochila (R)">✋ <span>MÃO LIVRE (R)</span></button>
+        <button id="stowAllBtn" class="fullscreen-btn stow-all-btn" type="button" title="Devolver ferramentas, materiais, peças e EPI aos seus lugares (T)">↩ <span>GUARDAR TUDO (T)</span></button>
+        <button id="turretBtn" class="fullscreen-btn turret-btn hidden" type="button" title="Torre do torno: pegar a ferramenta ou guardar no mesmo lugar (Y)">⇄ <span>PEGAR FERRAMENTA (Y)</span></button>
+        <button id="turretViewBtn" class="fullscreen-btn turret-view-btn hidden" type="button" title="Aproxima a câmera da torre de ferramentas do torno">🔍 <span>VER TORRE</span></button>
+        <button id="toolsBtn" class="fullscreen-btn tools-btn" type="button" title="Ver as ferramentas do armário (tecla &quot;)">&#x1F527; <span>FERRAMENTAS (")</span></button>
+        <div id="hotbar" class="hotbar" aria-label="Mochila (5 espaços)"></div>
+        <div id="crankHint" class="crank-hint hidden" role="status" aria-live="polite"></div>
+        <div id="toolWindow" class="tool-window hidden" role="dialog" aria-label="Ferramenta do armário">
+          <div class="tool-window-top"><small id="toolWinKicker">ARMÁRIO DE FERRAMENTAS</small><button type="button" id="toolWinClose" aria-label="Fechar">×</button></div>
+          <div id="toolWinCanvas" class="tool-win-canvas"></div>
+          <b id="toolWinName">Ferramenta</b>
+          <p id="toolWinDesc"></p>
+          <div class="tool-win-meta"><span id="toolWinMachine"></span><span id="toolWinRpm"></span></div>
+          <button type="button" id="toolWinUse" class="tool-win-use">Usar na fresadora</button>
+          <div class="tool-win-nav"><button type="button" id="toolWinPrev" aria-label="Anterior">‹</button><span id="toolWinIndex">1 / 10</span><button type="button" id="toolWinNext" aria-label="Próxima">›</button></div>
+        </div>
+      </div>
+      <div class="viewer-footer"><span><i class="blue-dot"></i> Mouse olha ao redor • C agacha • Espaço pula</span><span><i class="gold-dot"></i> E pega/interage quando estiver perto</span><span id="modeLabel">Modo: caminhada</span></div>
+      <section class="asset-library" aria-label="Galeria de imagens e modelos">
+        <div class="asset-library-top">
+          <div>
+            <div class="eyebrow">BIBLIOTECA VISUAL</div>
+            <h2>Imagens da oficina e modelos 3D</h2>
+            <p>Veja a imagem de referência, abra uma pasta do computador para mostrar as fotos dela e carregue um modelo 3D exportado.</p>
+          </div>
+          <div class="asset-actions">
+            <button type="button" id="chooseFolderBtn" class="asset-action">▤ Abrir pasta de imagens</button>
+            <button type="button" id="chooseImagesBtn" class="asset-action">＋ Adicionar imagens</button>
+            <button type="button" id="chooseModelBtn" class="asset-action asset-action-blue">◇ Abrir modelo 3D (.glb)</button>
+          </div>
+        </div>
+        <input id="folderInput" type="file" webkitdirectory directory multiple hidden>
+        <input id="imagesInput" type="file" accept="image/*" multiple hidden>
+        <input id="modelInput" type="file" accept=".glb,model/gltf-binary" hidden>
+        <div id="assetGrid" class="asset-grid">
+          <button type="button" class="asset-card" data-image-src="assets/imagens/referencia-torno-mecanico.png" data-image-title="Torno mecânico — referência visual">
+            <span class="asset-image-wrap"><img src="assets/imagens/referencia-torno-mecanico.png" alt="Torno mecânico tradicional em oficina industrial"><span class="asset-zoom">AMPLIAR ↗</span></span>
+            <span class="asset-card-copy"><b>Torno mecânico</b><small>Referência visual • clique para ampliar</small></span>
+          </button>
+          <button type="button" class="asset-card" data-image-src="assets/imagens/referencia-fresadora.png" data-image-title="Fresadora vertical — referência visual">
+            <span class="asset-image-wrap"><img src="assets/imagens/referencia-fresadora.png" alt="Fresadora vertical com mesa e ferramenta de corte"><span class="asset-zoom">AMPLIAR ↗</span></span>
+            <span class="asset-card-copy"><b>Fresadora vertical</b><small>Morsa, spindle e ferramenta • clique para ampliar</small></span>
+          </button>
+        </div>
+        <div id="assetStatus" class="asset-status">A galeria inclui uma imagem ilustrativa e o arquivo SketchUp enviado. Você também pode selecionar uma pasta com imagens do seu computador.</div>
+      </section>
+      <div id="imageLightbox" class="asset-lightbox hidden" role="dialog" aria-modal="true" aria-label="Visualizar imagem">
+        <button type="button" id="closeImageLightbox" class="asset-close" aria-label="Fechar">×</button>
+        <img id="lightboxImage" src="" alt="">
+        <div id="lightboxCaption" class="lightbox-caption"></div>
+      </div>
+      <div id="modelViewerOverlay" class="model-viewer-overlay hidden" role="dialog" aria-modal="true" aria-label="Visualizador do modelo 3D">
+        <div class="model-viewer-panel">
+          <div class="model-viewer-top"><div><small>VISUALIZADOR DE ARQUIVO</small><h2 id="modelViewerTitle">Modelo 3D</h2></div><button type="button" id="closeModelViewer" class="asset-close inline-close" aria-label="Fechar">×</button></div>
+          <p id="modelViewerStatus">Arraste para girar a câmera e use a roda do mouse para aproximar.</p>
+          <div id="modelCanvas" class="model-canvas"><div class="model-canvas-placeholder">Selecione um arquivo .glb para visualizar.</div></div>
+          <div class="model-viewer-footer"><span>Arraste: girar</span><span>Scroll: zoom</span><span>Botão direito: deslocar</span></div>
+        </div>
+      </div>
+      <div class="vr-note"><span class="vr-note-icon">◉</span><div><b>Teste em realidade virtual</b><small>Abra em um navegador compatível com WebXR e use o botão <strong>ENTER VR</strong>. No headset, aponte o controle para o painel 3D e aperte o gatilho. O stick esquerdo movimenta e o direito gira a câmera.</small></div></div>
+        <div class="machine-shortcuts"><button data-station="mill" class="station-select active"><span class="station-number">01</span><span><b>Fresadora convencional</b><small>Morsa • mesa T • avanços • automático</small></span><span class="arrow">↗</span></button><button data-station="lathe" class="station-select"><span class="station-number blue-number">02</span><span><b>Torno mecânico</b><small>Mandril • ferramenta • RPM • torneamento</small></span><span class="arrow">↗</span></button><button id="inspectBtn" class="inspect-btn">⟳ Inspecionar em órbita</button></div>
+    </section>
+    <aside class="workbench">
+      <section class="card active-card">
+        <div class="card-kicker"><span id="panelPulse" class="pulse"></span> PAINEL DE OPERAÇÃO</div>
+        <div class="active-title"><div><small>ESTAÇÃO SELECIONADA</small><h2 id="stationTitle">Fresadora convencional</h2></div><span class="machine-tag" id="stationTag">FV-02</span></div>
+        <div class="operation-status"><span><i id="machineStatusDot"></i><b id="machineStatusText">DESLIGADA</b></span><span id="rpmActual">0 RPM</span></div>
+        <div class="stepper"><div class="step current" data-step="1"><i>1</i><span>Peça</span></div><b></b><div class="step" data-step="2"><i>2</i><span>Fixação</span></div><b></b><div class="step" data-step="3"><i>3</i><span>Ferramenta</span></div><b></b><div class="step" data-step="4"><i>4</i><span>Corte</span></div></div>
+        <div id="autoCyclePanel" class="auto-cycle">
+          <div class="auto-cycle-title"><span><small>CICLO COMPLETO</small><b id="autoCycleTitle">Modo automático</b></span><span id="autoMachineTag" class="auto-cycle-badge">FV-02</span></div>
+          <p id="autoCycleDescription">Escolha a máquina, o material e quantas peças. Não precisa pegar barra nem selecionar nada no inventário: o ciclo prepara, usina e entrega sozinho. Você pode andar e usar a outra máquina enquanto isso.</p>
+          <div class="auto-field-label">Máquina</div>
+          <div class="auto-machine-pick" role="radiogroup" aria-label="Máquina do ciclo automático">
+            <button type="button" role="radio" data-auto-machine="mill" aria-checked="true" class="selected">Fresadora</button>
+            <button type="button" role="radio" data-auto-machine="lathe" aria-checked="false">Torno</button>
+            <button type="button" role="radio" data-auto-machine="both" aria-checked="false">As duas</button>
+          </div>
+          <div class="auto-options">
+            <label>Material<select id="autoMaterial"><option value="steel">Aço</option><option value="aluminum">Alumínio</option><option value="brass">Latão</option><option value="bronze">Bronze</option><option value="gold">Ouro</option></select></label>
+            <label>Peças<select id="autoQuantity"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option></select></label>
+          </div>
+          <div class="auto-cycle-controls"><button id="autoStartBtn" type="button">▶ Colocar tudo no automático</button><button id="autoStopBtn" type="button" class="auto-stop" title="Para tudo: ciclo automático, passada e motor">■ Parar tudo</button></div>
+          <div class="chip-pan-row"><span><small>CAVACO DO TORNO</small><b id="chipPanLevel">0 / 5</b></span><span class="chip-pan-bar"><i id="chipPanBar"></i></span><button type="button" id="emptyChipsBtn">Esvaziar cavaco (X)</button></div>
+          <div class="auto-status-list">
+            <div id="autoStatusMill" class="auto-status" aria-live="polite"><b>FRESADORA</b> Pronta para iniciar.</div>
+            <div id="autoStatusLathe" class="auto-status" aria-live="polite"><b>TORNO</b> Pronto para iniciar.</div>
+          </div>
+        </div>
+      </section>
+      <section class="card process-card">
+        <div class="section-head"><div><small>ETAPA 01</small><h3 id="partSectionTitle">Preparar a peça</h3></div><span class="step-index">01</span></div>
+        <label class="field-label" for="stockSelect">Material da peça</label>
+        <select id="stockSelect"><option value="steel">Aço</option><option value="aluminum">Alumínio</option><option value="brass">Latão</option><option value="bronze">Bronze</option><option value="gold">Ouro</option></select>
+        <div class="part-preview"><div class="part-graphic"><span></span><span></span><span></span></div><div><b id="partName">Bloco retangular</b><small id="partDimensions">60 × 30 × 18 mm • escala didática</small></div></div>
+        <button id="loadPieceBtn" class="full-btn secondary">＋ Colocar peça selecionada</button>
+        <button id="removePieceBtn" class="full-btn quiet">Retirar peça</button>
+      </section>
+      <section class="card process-card">
+        <div class="section-head"><div><small>ETAPA 02</small><h3 id="fixSectionTitle">Prender na morsa</h3></div><span class="step-index">02</span></div>
+        <p class="muted-description" id="fixDescription">A peça precisa estar na mesa antes de fechar a morsa.</p>
+        <div class="fix-visual"><span class="vice-jaw"></span><span class="vice-piece"></span><span class="vice-jaw right"></span><span class="vice-arrow">↔</span></div>
+        <button id="clampPieceBtn" class="full-btn secondary" disabled>⊣ Fechar morsa</button>
+      </section>
+      <section class="card process-card">
+        <div class="section-head"><div><small>ETAPA 03</small><h3 id="toolSectionTitle">Instalar ferramenta de corte</h3></div><span class="step-index">03</span></div>
+        <label class="field-label" for="toolSelect">Tipo de ferramenta</label>
+        <select id="toolSelect"><option value="endmill">Fresa de topo Ø10 mm</option><option value="facemill">Fresa de face Ø25 mm</option><option value="drill">Broca Ø8 mm</option></select>
+        <div class="tool-status"><div class="tool-icon">⌁</div><div><b id="toolName">Fresa de topo</b><small id="toolRange">Faixa didática: 500–3000 RPM</small></div><span id="toolAttachStatus" class="status-badge">NÃO INSTALADA</span></div>
+        <div class="button-pair"><button id="installToolBtn" class="secondary small-btn">＋ Instalar</button><button id="clampToolBtn" class="secondary small-btn" disabled>⊣ Prender</button></div>
+        <div id="turretMap" class="turret-map hidden"></div>
+        <div id="turretRow" class="button-pair turret-row hidden"><button id="turretRotateBtn" class="secondary small-btn" title="Gira a torre 90° para a próxima posição">↻ Girar torre</button><button id="turretTakeBtn" class="secondary small-btn" title="Pega a ferramenta da posição ativa ou guarda de volta no mesmo lugar (Y)">⇄ Pegar ferramenta</button></div>
+        <button id="removeToolBtn" class="full-btn quiet">Retirar ferramenta</button>
+      </section>
+      <section class="card process-card rpm-card">
+        <div class="section-head"><div><small>ETAPA 04</small><h3>Ajustar rotação</h3></div><span class="step-index">04</span></div>
+        <div class="rpm-display"><div><small>ROTAÇÃO DEFINIDA</small><b><span id="rpmValue">1200</span><em> RPM</em></b></div><div class="rpm-icon">◉</div></div>
+        <input id="rpmSlider" type="range" min="300" max="3000" step="100" value="1200" aria-label="Ajustar RPM">
+        <div class="range-labels"><span>300 RPM</span><span>3000 RPM</span></div>
+        <div class="quick-rpm"><button data-rpm="600">600</button><button data-rpm="1200" class="selected">1200</button><button data-rpm="1800">1800</button><button data-rpm="2400">2400</button></div>
+        <div class="machine-control-grid"><button id="powerBtn" class="power-btn" disabled>⏻ Ligar máquina</button><button id="emergencyBtn" class="emergency-btn" type="button" aria-pressed="false">■ Parada de emergência</button></div>
+        <button id="machineBtn" class="cut-btn cut-action" disabled>▶ Usinar peça</button>
+        <small class="machine-control-hint">Na vista em órbita, também dá para clicar nos comandos físicos da máquina.</small>
+        <div id="progressWrap" class="progress-wrap hidden"><div class="progress-top"><span id="progressLabel">Passada de usinagem</span><b id="progressPercent">0%</b></div><div class="progress-track"><i id="progressBar"></i></div></div>
+      </section>
+      <section class="card log-card"><div class="section-head"><div><small>REGISTRO DA OPERAÇÃO</small><h3>Etapas do processo</h3></div><button id="clearLogBtn" class="clear-btn">Limpar</button></div><div id="operationLog" class="operation-log"><div class="log-line"><i>•</i><span>Oficina pronta. Selecione uma estação para começar.</span><time>AGORA</time></div></div><p class="safety-note"><b>!</b> Simulação educacional: a animação não representa corte físico preciso nem controla máquinas reais. Em máquinas industriais, siga sempre o procedimento do instrutor.</p></section>
+      <section class="card inventory-card" id="inventoryPanel">
+        <div class="section-head"><div><small>MOCHILA DO OPERADOR</small><h3>Inventário & vendas</h3></div><span class="step-index" id="inventoryCount">0 / 5</span></div>
+        <div class="wallet-line"><div><small>SALDO DA OFICINA</small><b id="walletAmount">R$ 0,00</b></div><span class="wallet-coin">$</span></div>
+        <p class="inventory-description">A mochila tem 5 espaços (teclas 1 a 5). Pegue cilindros e blocos na bancada de materiais; a peça usinada cai na caixinha ao lado da máquina para vender com E.</p>
+        <div id="inventorySlots" class="inventory-slots"><div class="inventory-empty">Inventário vazio. Explore a oficina e pressione E perto de uma peça.</div></div>
+        <div id="selectedInventoryLabel" class="selected-inventory-label">Nenhum item selecionado</div>
+        <div class="inventory-action-row"><button id="dropItemBtn" class="secondary small-btn" disabled>↘ Soltar item (Q)</button><button id="sellAllBtn" class="sell-btn" disabled>＄ Vender peças</button></div>
+        <div class="sale-booth-hint"><span class="sale-pulse"></span> Na caixinha ao lado da máquina, E vende a peça pronta; F guarda na mochila. No balcão, E vende tudo da mochila. O botão ciano inicia o automático na fresadora e no torno.</div>
+        <div id="saleNotice" class="sale-notice hidden"></div>
+      </section>
+    </aside>
+  </main>
+  <footer><span>OFICINA 3D <b>•</b> SIMULADOR EDUCACIONAL</span><span>THREE.JS · JAVASCRIPT · WEBGL <b>•</b> MODELO GEOMÉTRICO ORIGINAL</span></footer>
+</div>
+<div id="helpOverlay" class="overlay hidden"><div class="modal"><button id="closeHelp" class="modal-close">×</button><div class="eyebrow">GUIA RÁPIDO</div><h2>Como realizar uma usinagem</h2><ol><li>Selecione a fresadora ou o torno e escolha o material da peça.</li><li>Clique em <b>Colocar tudo no automático</b>. O simulador prepara e fixa a peça e a ferramenta, liga a máquina, usina uma peça e desliga ao concluir.</li><li>Se preferir operar manualmente, escolha a ferramenta, clique em <b>Instalar</b> e depois em <b>Prender</b>.</li><li>Ajuste os RPM, ligue a máquina e execute <b>Usinar peça</b>. Não precisa de chave de manutenção.</li><li>A operação é animada no modelo 3D; a peça pronta aparece na mesa de peças prontas (ao lado do balcão) para venda direta.</li></ol><div class="modal-controls"><div><kbd>W A S D</kbd><span>Caminhar</span></div><div><kbd>MOUSE</kbd><span>Olhar ao redor</span></div><div><kbd>SHIFT</kbd><span>Correr</span></div><div><kbd>C</kbd><span>Agachar</span></div><div><kbd>SPACE</kbd><span>Pular</span></div><div><kbd>E</kbd><span>Pegar / interagir</span></div><div><kbd>A / D</kbd><span>Girar o volante engatado</span></div><div><kbd>CLIQUE</kbd><span>Acionar manetes e alavancas</span></div><div><kbd>Q</kbd><span>Soltar item selecionado</span></div><div><kbd>F</kbd><span>Guardar peça da mesa</span></div><div><kbd>I</kbd><span>Destacar inventário</span></div><div><kbd>ESC</kbd><span>Liberar o mouse</span></div></div><p class="safety-note"><b>!</b> Simulador didático. Valores de rotação são ilustrativos; não representam recomendações de processo para material, ferramenta ou máquina real.</p><button id="closeHelpBottom" class="full-btn primary">Entendi</button></div></div>
+<script type="module" src="main.js"></script>
+</body></html>

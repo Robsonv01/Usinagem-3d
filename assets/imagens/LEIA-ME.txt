@@ -1,0 +1,3 @@
+As imagens ilustrativas desta pasta aparecem na galeria de imagens do site.
+Para adicionar outras imagens, copie os arquivos para esta pasta e acrescente um cartão no index.html.
+Também é possível escolher qualquer outra pasta pelo botão “Abrir pasta de imagens” dentro da página.
